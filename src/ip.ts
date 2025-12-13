@@ -1,4 +1,64 @@
-import { Impit } from "impit";
+// Dynamic import with fallback - avoids crash when impit native bindings unavailable
+
+// Minimal response interface that works with both Impit and native fetch
+interface FetchLikeResponse {
+	ok: boolean;
+	text(): Promise<string>;
+}
+
+interface HttpClient {
+	fetch(url: string): Promise<FetchLikeResponse>;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Dynamic import requires any
+let ImpitClass: any = null;
+let fallbackWarningShown = false;
+
+async function getHttpClient(options: {
+	proxyUrl?: string;
+	timeout?: number;
+}): Promise<HttpClient> {
+	// Try to use impit if available (first call only)
+	if (ImpitClass === null) {
+		try {
+			const mod = await import("impit");
+			ImpitClass = mod.Impit;
+		} catch {
+			// impit not available - use fallback
+			ImpitClass = false;
+
+			// Show warning once
+			if (!fallbackWarningShown) {
+				console.warn(
+					"\x1b[33m⚠️  camoufox-js: impit native module not available.\n" +
+						"   Using native fetch fallback (proxy support disabled for IP detection).\n" +
+						"   This is expected on Bun runtime or unsupported platforms.\x1b[0m",
+				);
+				fallbackWarningShown = true;
+			}
+		}
+	}
+
+	if (ImpitClass) {
+		return new ImpitClass(options);
+	}
+
+	// Fallback: Native fetch wrapper (no proxy support)
+	// Warning: proxy parameter is ignored in fallback mode
+	if (options.proxyUrl && !fallbackWarningShown) {
+		console.warn(
+			"\x1b[33m⚠️  camoufox-js: Proxy ignored for IP detection (impit unavailable)\x1b[0m",
+		);
+	}
+
+	return {
+		async fetch(url: string): Promise<Response> {
+			return fetch(url, {
+				signal: AbortSignal.timeout(options.timeout || 5000),
+			});
+		},
+	};
+}
 
 export class InvalidIP extends Error {}
 export class InvalidProxy extends Error {}
@@ -82,15 +142,15 @@ export async function publicIP(proxy?: string): Promise<string> {
 		"https://ipecho.net/plain",
 	];
 
-	const errors = [];
+	const errors: Error[] = [];
 
 	for (const url of URLS) {
 		try {
-			const impit = new Impit({
+			const client = await getHttpClient({
 				proxyUrl: proxy,
 				timeout: 5000,
 			});
-			const response = await impit.fetch(url);
+			const response = await client.fetch(url);
 
 			if (!response.ok) {
 				continue;
@@ -100,7 +160,7 @@ export async function publicIP(proxy?: string): Promise<string> {
 			validateIP(ip);
 			return ip;
 		} catch (error) {
-			errors.push(error);
+			errors.push(error as Error);
 			if (process.env.CAMOUFOX_DEBUG) {
 				console.warn(
 					new InvalidProxy(
