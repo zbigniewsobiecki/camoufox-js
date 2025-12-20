@@ -1,5 +1,5 @@
 import path from "node:path";
-import Database from "better-sqlite3";
+import { Database } from "../sqlite-compat.js";
 import { OS_ARCH_MATRIX } from "../pkgman.js";
 
 // Get database path relative to this file
