@@ -8,26 +8,27 @@ export interface Statement {
 	all(...params: unknown[]): unknown[];
 }
 
-export interface Database {
+export interface DatabaseInterface {
 	prepare(sql: string): Statement;
 	close(): void;
 }
 
-// Check if running in Bun
-const isBun = typeof globalThis.Bun !== "undefined";
+// Check if running in Bun - use process.versions which exists in both runtimes
+const isBun = "bun" in process.versions;
 
-let DatabaseClass: new (filename: string) => Database;
+type DatabaseConstructor = new (filename: string) => DatabaseInterface;
+
+let DatabaseClass: DatabaseConstructor;
 
 if (isBun) {
 	// Bun runtime - use built-in bun:sqlite
-	// biome-ignore lint/style/noVar: dynamic import needs var for hoisting
-	var { Database: BunDatabase } = await import("bun:sqlite");
-	DatabaseClass = BunDatabase as unknown as new (filename: string) => Database;
+	// @ts-expect-error - bun:sqlite is a Bun-specific module
+	const { Database: BunDatabase } = await import("bun:sqlite");
+	DatabaseClass = BunDatabase as DatabaseConstructor;
 } else {
 	// Node.js - use better-sqlite3
-	// biome-ignore lint/style/noVar: dynamic import needs var for hoisting
-	var BetterSqlite3 = (await import("better-sqlite3")).default;
-	DatabaseClass = BetterSqlite3 as unknown as new (filename: string) => Database;
+	const BetterSqlite3 = (await import("better-sqlite3")).default;
+	DatabaseClass = BetterSqlite3 as unknown as DatabaseConstructor;
 }
 
 export { DatabaseClass as Database };
