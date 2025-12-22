@@ -244,8 +244,14 @@ export class CamoufoxFetcher extends GitHubDownloader {
 	}
 
 	async extractZip(zipFile: string | Buffer): Promise<void> {
-		const zip = new AdmZip(zipFile);
-		zip.extractAllTo(INSTALL_DIR.toString(), true);
+		if (typeof zipFile === "string") {
+			// Use native unzip for file paths (memory efficient, streams extraction)
+			execSync(`unzip -o -q "${zipFile}" -d "${INSTALL_DIR}"`, { stdio: "pipe" });
+		} else {
+			// Fallback to AdmZip for Buffer input
+			const zip = new AdmZip(zipFile);
+			zip.extractAllTo(INSTALL_DIR.toString(), true);
+		}
 	}
 
 	static cleanup(): boolean {
