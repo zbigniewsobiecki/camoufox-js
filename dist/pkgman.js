@@ -182,7 +182,10 @@ export class CamoufoxFetcher extends GitHubDownloader {
     async extractZip(zipFile) {
         if (typeof zipFile === "string") {
             // Use native unzip for file paths (memory efficient, streams extraction)
-            execSync(`unzip -o -q "${zipFile}" -d "${INSTALL_DIR}"`, { stdio: "pipe" });
+            // Use || true to ignore warnings (e.g., unicode filename mismatches)
+            execSync(`unzip -o -q "${zipFile}" -d "${INSTALL_DIR}" || true`, {
+                stdio: "ignore",
+            });
         }
         else {
             // Fallback to AdmZip for Buffer input
