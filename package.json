@@ -31,6 +31,7 @@
 	"packageManager": "yarn@4.12.0",
 	"dependencies": {
 		"adm-zip": "^0.5.16",
+		"better-sqlite3": "^11.0.0",
 		"commander": "^14.0.0",
 		"fingerprint-generator": "^2.1.66",
 		"glob": "^13.0.0",
@@ -41,7 +42,6 @@
 		"xml2js": "^0.6.2"
 	},
 	"optionalDependencies": {
-		"better-sqlite3": "^11.0.0",
 		"impit": "^0.7.0"
 	},
 	"devDependencies": {
