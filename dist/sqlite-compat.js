@@ -1,8 +1,9 @@
 /**
  * Runtime-aware SQLite compatibility layer.
- * Uses bun:sqlite in Bun runtime, better-sqlite3 in Node.js.
+ * Uses bun:sqlite in Bun runtime, sql.js (WASM) in Node.js.
  */
-// Check if running in Bun - use process.versions which exists in both runtimes
+import fs from "node:fs";
+// Check if running in Bun
 const isBun = "bun" in process.versions;
 let DatabaseClass;
 if (isBun) {
@@ -12,8 +13,36 @@ if (isBun) {
     DatabaseClass = BunDatabase;
 }
 else {
-    // Node.js - use better-sqlite3
-    const BetterSqlite3 = (await import("better-sqlite3")).default;
-    DatabaseClass = BetterSqlite3;
+    // Node.js - use sql.js (pure JavaScript/WASM SQLite)
+    const initSqlJs = (await import("sql.js")).default;
+    const SQL = await initSqlJs();
+    class SqlJsWrapper {
+        db;
+        constructor(filename) {
+            const buffer = fs.readFileSync(filename);
+            this.db = new SQL.Database(buffer);
+        }
+        prepare(sql) {
+            const db = this.db;
+            return {
+                all(...params) {
+                    const stmt = db.prepare(sql);
+                    if (params.length > 0) {
+                        stmt.bind(params);
+                    }
+                    const results = [];
+                    while (stmt.step()) {
+                        results.push(stmt.getAsObject());
+                    }
+                    stmt.free();
+                    return results;
+                },
+            };
+        }
+        close() {
+            this.db.close();
+        }
+    }
+    DatabaseClass = SqlJsWrapper;
 }
 export { DatabaseClass as Database };
